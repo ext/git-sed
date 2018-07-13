@@ -1,0 +1,84 @@
+#!/bin/bash
+
+usage(){
+	echo "execute sed script on all tracked files."
+	echo "usage: git sed [OPTIONS..] SCRIPT [FILE-PATTERN..]"
+	echo "  or   git sed [OPTIONS..] -e SCRIPT [FILE-PATTERN..]"
+	echo
+	echo "Where:"
+	echo "  OPTIONS are passed to sed."
+	echo "  SCRIPT is the sed script to execute."
+	echo "  FILE-PATTERN is optionally the paths, files or patterns to run on."
+	echo ""
+	echo "Files are listed using ls-files. By using "--" extra arguments can be passed."
+	echo "E.g. \`git sed ... -- -s\` to pass -s to ls-files to only process staged files."
+	echo
+	echo "Options:"
+	echo "  -e SCRIPT, --expression=SCRIPT   add the script to commands to be executed"
+	echo "  -f FILE, --file FILE             add the contents of script-file to the commands to be executed"
+	echo "  -E, -r, --regexp-extended        use extended regular expressions in the script"
+	echo "  -h, --help                       display this help and exit"
+	echo "  --version                        output version information and exit"
+}
+
+version(){
+	echo "$(basename $0) v1.0 (C) 2018 David Sveningsson <ext@sidvind.com>"
+}
+
+if [[ $# -eq 0 ]]; then
+	usage
+	exit 1
+fi
+
+# Parse options so sed arguments can be separated from file patters
+# OPTS will contain all arguments first followed by a -- separator followed by positionals
+# -e foo -- filename
+OPTS=$(getopt -o e:f:Erh -l expression:,file:,regexp-extended,help,version -n "$(basename $0)" -- "$@")
+if [[ $? != 0 ]]; then
+	exit $?;
+fi
+eval set -- "$OPTS"
+
+# split arguments so everything before -- is pushed to sed array
+sed=()
+expression=
+while true; do
+	case "$1" in
+		--)
+			# when -- is encountered the rest is positional arguments so stop parsing args
+			shift;
+			break
+			;;
+		-h|--help)
+			usage
+			exit 0
+			;;
+		--version)
+			version
+			exit 0
+			;;
+		-e|--expression)
+			# flag that an expression is present, dont pop first positional as script
+			# fallthough to default handling
+			expression=1
+			;&
+		*)
+			# push argument to sed
+			sed+=("$1")
+			shift
+			;;
+	esac
+done
+
+# if -e wasn't used assume first positional is the script to execute, similar to
+# how sed does
+if [[ -z "${expression}" ]]; then
+	sed+=("$1")
+	shift
+fi
+
+set -e
+for filename in $(git ls-files "$@"); do
+	echo "$filename"
+	sed "${sed[@]}" -i "${filename}"
+done
