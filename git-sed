@@ -78,6 +78,7 @@ if [[ -z "${expression}" ]]; then
 fi
 
 set -e
+IFS=$'\n'
 for filename in $(git ls-files "$@"); do
 	echo "$filename"
 	sed "${sed[@]}" -i "${filename}"
